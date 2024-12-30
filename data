@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="dataVizApp">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Visualization App</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- AngularJS -->
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
+</head>
+<body class="bg-gray-900 text-gray-300 p-8" ng-controller="DataVizController">
+
+    <!-- Main content area - container now takes full width on larger screens -->
+    <div class="container mx-auto lg:w-4/5 p-6 bg-gray-800 rounded-lg shadow-lg">
+
+        <!-- Grid layout for inputs and controls on larger screens -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <!-- Input data section -->
+            <div class="mb-6">
+                <h2 class="text-xl font-bold mb-4 text-gray-200">Enter Your Data (comma-separated)</h2>
+                <textarea ng-model="inputData" placeholder="Enter data like 10, 20, 30, 40" rows="3" class="w-full p-2 border rounded bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400"></textarea>
+            </div>
+
+            <!-- Input labels section -->
+            <div class="mb-6">
+                <h2 class="text-lg font-bold mb-4 text-gray-200">Enter Labels (comma-separated)</h2>
+                <textarea ng-model="inputLabels" placeholder="Enter labels like A, B, C, D" rows="2" class="w-full p-2 border rounded bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400"></textarea>
+            </div>
+
+            <!-- Select chart type -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold mb-2 text-gray-200">Select Chart Type</h3>
+                <select ng-model="chartType" class="p-2 border rounded w-full bg-gray-700 border-gray-600 text-gray-100">
+                    <option value="bar">Bar Chart</option>
+                    <option value="line">Line Chart</option>
+                    <option value="pie">Pie Chart</option>
+                    <option value="doughnut">Donut Chart</option>
+                    <option value="scatter">Scatter Plot</option>
+                    <option value="area">Area Chart</option>
+                    <option value="bullet">Bullet Graph</option>
+                    <option value="radar">Radar Chart</option>
+                    <option value="polarArea">Polar Area Chart</option>
+                    <option value="bubble">Bubble Chart</option>
+                    <option value="gauge">Gauge Chart</option>
+                </select>
+            </div>
+
+            <!-- Color Picker -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold mb-2 text-gray-200">Select Chart Color</h3>
+                <input type="color" ng-model="chartColor" class="w-full p-2 border rounded bg-gray-700 border-gray-600">
+            </div>
+        </div>
+
+        <!-- Button to visualize data -->
+        <div class="text-center mb-6">
+            <button ng-click="visualizeData()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Visualize</button>
+        </div>
+
+        <!-- Chart Container -->
+        <div class="w-full flex justify-center mb-6 overflow-hidden">
+            <div class="w-full max-w-3xl"> <!-- Increased max width for larger container -->
+                <canvas id="myChart" class="max-w-full max-h-full" width="400" height="400"></canvas>
+            </div>
+        </div>
+
+        <!-- Button to download chart -->
+        <div class="text-center mt-6">
+            <label for="format-select" class="mr-4 text-gray-200">Download as:</label>
+            <select id="format-select" ng-model="downloadFormat" class="p-2 border rounded w-1/4 bg-gray-700 border-gray-600 text-gray-100">
+                <option value="png">PNG</option>
+                <option value="jpeg">JPEG</option>
+            </select>
+            <button ng-click="downloadChart(downloadFormat)" class="bg-green-600 text-white px-4 py-2 rounded ml-4 hover:bg-green-700">Download Chart</button>
+        </div>
+
+        <!-- User Instructions -->
+        <div class="mt-6 p-4 bg-gray-700 rounded text-gray-200">
+            <h4 class="font-semibold mb-2">Instructions:</h4>
+            <p>1. Enter your data in the first input as comma-separated numbers (e.g., 10, 20, 30).</p>
+            <p>2. Optionally, enter custom labels for your data in the second input (e.g., A, B, C).</p>
+            <p>3. Choose a chart type and color, then click "Visualize" to see your chart.</p>
+            <p>4. After generating the chart, select a download format and click "Download Chart" to save the image.</p>
+        </div>
+    </div>
+
+    
+    <script>
+        angular.module('dataVizApp', [])
+        .controller('DataVizController', function($scope) {
+            $scope.inputData = '';
+            $scope.inputLabels = '';
+            $scope.chartType = 'bar';
+            $scope.chartColor = '#36A2EB';
+            $scope.downloadFormat = 'png';
+            let chartInstance;
+
+            // Function to visualize data
+            $scope.visualizeData = function() {
+                // Validate the input data
+                if (!$scope.inputData.match(/^(\d+\s*,\s*)*\d+$/)) {
+                    alert('Invalid input. Please enter numbers separated by commas.');
+                    return;
+                }
+                
+                let data = $scope.inputData.split(',').map(Number);
+                let labels = $scope.inputLabels ? $scope.inputLabels.split(',') : data.map((_, i) => `Label ${i + 1}`);
+                let ctx = document.getElementById('myChart').getContext('2d');
+                
+                // Destroy the previous chart instance if it exists
+                if (chartInstance) {
+                    chartInstance.destroy();
+                }
+
+                let chartConfig = {};
+
+                // Build chart configuration based on selected chart type
+                switch ($scope.chartType) {
+                    case 'bar':
+                        chartConfig = {
+                            type: 'bar',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: 'Data Values',
+                                    data: data,
+                                    backgroundColor: $scope.chartColor + '80',  // Adjust opacity
+                                    borderColor: $scope.chartColor,
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                scales: {
+                                    y: {
+                                        beginAtZero: true
+                                    }
+                                }
+                            }
+                        };
+                        break;
+
+                    case 'pie':
+                        chartConfig = {
+                            type: 'pie',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: 'Data Values',
+                                    data: data,
+                                    backgroundColor: [
+                                        'rgba(255, 99, 132, 0.2)',
+                                        'rgba(54, 162, 235, 0.2)',
+                                        'rgba(255, 206, 86, 0.2)',
+                                        'rgba(75, 192, 192, 0.2)',
+                                        'rgba(153, 102, 255, 0.2)'
+                                    ],
+                                    borderColor: [
+                                        'rgba(255, 99, 132, 1)',
+                                        'rgba(54, 162, 235, 1)',
+                                        'rgba(255, 206, 86, 1)',
+                                        'rgba(75, 192, 192, 1)',
+                                        'rgba(153, 102, 255, 1)'
+                                    ],
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true
+                            }
+                        };
+                        break;
+
+                    case 'radar':
+                        chartConfig = {
+                            type: 'radar',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: 'Data Values',
+                                    data: data,
+                                    backgroundColor: $scope.chartColor + '80', // Opacity for radar fill
+                                    borderColor: $scope.chartColor,
+                                    pointBackgroundColor: $scope.chartColor,
+                                    fill: true
+                                }]
+                            },
+                            options: {
+                                scales: {
+                                    r: {
+                                        beginAtZero: true
+                                    }
+                                }
+                            }
+                        };
+                        break;
+
+                    case 'polarArea':
+                        chartConfig = {
+                            type: 'polarArea',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    data: data,
+                                    backgroundColor: [
+                                        'rgba(255, 99, 132, 0.2)',
+                                        'rgba(54, 162, 235, 0.2)',
+                                        'rgba(255, 206, 86, 0.2)',
+                                        'rgba(75, 192, 192, 0.2)',
+                                        'rgba(153, 102, 255, 0.2)'
+                                    ],
+                                    borderColor: [
+                                        'rgba(255, 99, 132, 1)',
+                                        'rgba(54, 162, 235, 1)',
+                                        'rgba(255, 206, 86, 1)',
+                                        'rgba(75, 192, 192, 1)',
+                                        'rgba(153, 102, 255, 1)'
+                                    ],
+                                    borderWidth: 1
+                                }]
+                            }
+                        };
+                        break;
+
+                    case 'line':
+                        chartConfig = {
+                            type: 'line',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: 'Data Values',
+                                    data: data,
+                                    borderColor: $scope.chartColor,
+                                    backgroundColor: $scope.chartColor + '80',
+                                    fill: false,
+                                    tension: 0.1
+                                }]
+                            },
+                            options: {
+                                scales: {
+                                    y: {
+                                        beginAtZero: true
+                                    }
+                                }
+                            }
+                        };
+                        break;
+
+                    case 'bubble':
+                        chartConfig = {
+                            type: 'bubble',
+                            data: {
+                                datasets: [{
+                                    label: 'Bubble Dataset',
+                                    data: data.map((val, i) => ({ x: i + 1, y: val, r: val * 2 })), // 'r' controls bubble size
+                                    backgroundColor: $scope.chartColor + '80',
+                                    borderColor: $scope.chartColor
+                                }]
+                            },
+                            options: {
+                                scales: {
+                                    x: {
+                                        beginAtZero: true
+                                    },
+                                    y: {
+                                        beginAtZero: true
+                                    }
+                                }
+                            }
+                        };
+                        break;
+
+                    case 'scatter':
+                        chartConfig = {
+                            type: 'scatter',
+                            data: {
+                                datasets: [{
+                                    label: 'Scatter Dataset',
+                                    data: data.map((val, i) => ({ x: i + 1, y: val })),
+                                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                    borderColor: 'rgba(255, 99, 132, 1)',
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                scales: {
+                                    x: {
+                                        type: 'linear',
+                                        position: 'bottom'
+                                    }
+                                }
+                            }
+                        };
+                        break;
+                        
+                        case 'doughnut':
+    chartConfig = {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Data Values',
+                data: data,
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.2)',
+                    'rgba(54, 162, 235, 0.2)',
+                    'rgba(255, 206, 86, 0.2)',
+                    'rgba(75, 192, 192, 0.2)',
+                    'rgba(153, 102, 255, 0.2)',
+                    'rgba(255, 159, 64, 0.2)'
+                ],
+                borderColor: [
+                    'rgba(255, 99, 132, 1)',
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(255, 206, 86, 1)',
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(153, 102, 255, 1)',
+                    'rgba(255, 159, 64, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                datalabels: {
+                    color: '#000000',
+                    display: true,
+                    formatter: (value, ctx) => {
+                        let sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                        let percentage = (value / sum * 100).toFixed(2) + "%";
+                        return percentage;
+                    }
+                }
+            }
+        }
+    };
+    break;
+
+                    case 'area':
+                        chartConfig = {
+                            type: 'line',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: 'Area Chart',
+                                    data: data,
+                                    borderColor: $scope.chartColor,
+                                    backgroundColor: $scope.chartColor + '80',
+                                    fill: true,  // Fill the area below the line 
+                                    tension: 0.4
+                                }]
+                            },
+                            options: {
+                                scales: {
+                                    y: {
+                                        beginAtZero: true
+                                    }
+                                }
+                            }
+                        };
+                        break;
+
+                    case 'bullet':
+                        chartConfig = {
+                            type: 'bar',
+                            data: {
+                                labels: ['Target'],
+                                datasets: [
+                                    {
+                                        label: 'Target',
+                                        data: [100],  // Example target value
+                                        backgroundColor: 'rgba(200, 200, 200, 0.6)',  // Target bar color
+                                        borderWidth: 1
+                                    },
+                                    {
+                                        label: 'Progress',
+                                        data: [data[0]],  // The first value is considered progress
+                                        backgroundColor: $scope.chartColor,
+                                        borderWidth: 1
+                                    }
+                                ]
+                            },
+                            options: {
+                                scales: {
+                                    x: {
+                                        stacked: true
+                                    },
+                                    y: {
+                                        beginAtZero: true,
+                                        max: 100  // Example max value for the bullet chart
+                                    }
+                                }
+                            }
+                        };
+                        break;
+
+                    case 'gauge':
+                        chartConfig = {
+                            type: 'doughnut',
+                            data: {
+                                labels: ['Progress', 'Remaining'],
+                                datasets: [{
+                                    data: [data[0], 100 - data[0]],
+                                    backgroundColor: [$scope.chartColor, '#e0e0e0']
+                                }]
+                            },
+                            options: {
+                                rotation: Math.PI, // Start at the top
+                                circumference: Math.PI, // Half circle
+                                cutout: '90%' // Adjust the size of the gauge arc
+                            }
+                        };
+                        break;
+
+                    default:
+                        alert('Unsupported chart type');
+                        return;
+                }
+
+                // Create the new chart
+                chartInstance = new Chart(ctx, chartConfig);
+            };
+
+            // Function to download the chart as an image
+            $scope.downloadChart = function(format = 'png') {
+                let canvas = document.getElementById('myChart');
+                let link = document.createElement('a');
+                link.href = canvas.toDataURL(`image/${format}`);
+                link.download = `chart.${format}`;
+                link.click();
+            };
+        });
+    </script>
+
+</body>
+</html>
